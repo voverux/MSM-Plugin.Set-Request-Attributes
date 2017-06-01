@@ -1,0 +1,314 @@
+﻿<meta http-equiv="Content-type" content="text/html;charset=UTF-8">
+<script src="Template.js"></script>
+<script>
+    (function () {
+
+        var MarvalSoftware = window.top.MarvalSoftware;
+        var $ = window.top.$;
+
+        MarvalSoftware.Plugins.define("marval-baltic-plugins-set-request-attributes",
+            {
+                _pluginPath: null,
+                _pluginId: "marval-baltic-plugins-set-request-attributes",
+                _quickMenuItemImageFileName: "request_attribute_32.png",
+                _pluginWindowTitle: "Set Request Attributes",
+                _pluginHandlerRequest: null,
+                _pluginRules: {
+                    "rules": [
+                        {
+							"name": "Rule name",
+                            "conditions": [
+                                {
+                                    "type": "reqtype",
+                                    "value": [1, 2, 6]
+                                },
+                                {
+                                    "type": "param",
+                                    "id": "isnew",
+                                    "value": true
+                                },
+                                {
+                                    "type": "wfstatus",
+                                    "value": [1, 2, 3, 4]
+                                },
+                                {
+                                    "type": "dict",
+                                    "id": 2,
+                                    "value": [100, 105]
+                                }
+                            ],
+                            "actions": [
+                                {
+                                    "action": "set",
+                                    "type": "attr",
+                                    "id": 1005,
+                                    "value": "Some Text Here",
+									"_override": false
+                                },
+                                {
+                                    "action": "set",
+                                    "type": "attr",
+                                    "id": 1006,
+                                    "value": "Another Text Here",
+									"_override": false
+                                }
+                            ]
+                        }
+                    ]
+                },
+                _modifiedAttributes: [{ "attr_id": 0, "attr_value": "" }],
+                _modifiedAttributesInProgress: [],
+
+                _getPluginPath: function () {
+                    return this.attributes["data-pluginpath"].value;
+                },
+
+                init: function () {
+                    this._getActionMessageKey(
+                        this,
+                        this._setEvents
+                    );
+                },
+
+                _getActionMessageKey: function (plugin, callbackSetEvents) {
+					if (this._pluginHandlerRequest) {
+                        this._pluginHandlerRequest.abort();
+                        this._pluginHandlerRequest = null;
+                    }
+                    this._pluginHandlerRequest = $.ajax({
+                        type: "GET",
+                        url: this._getPluginPath() + "handler/SetRequestAttributesHandler.ashx",
+                        contentType: "application/json; charset=utf-8",
+                        dataType: "json",
+                        success: function (result) {
+                            callbackSetEvents(plugin, result);
+                        }.bind(this),
+                        error: function (xhr, ajaxOptions, thrownError) {
+                            if (xhr.status > 0) this._showErrorMessage(xhr.status + '\n' + thrownError);
+                        }.bind(this)
+                    });
+                },
+
+                _setEvents: function (plugin, actionMessageKey) {
+                    if (actionMessageKey && actionMessageKey.length > 0) {
+
+                        //var locationIDElement = window.top.document.getElementById($(locationFieldSelector)[0].id + '_selectedValue');
+                        //if (locationIDElement) {
+                        //    if (locationIDElement.addEventListener) {
+                        //        locationIDElement.addEventListener("change", function (e) {
+                        //            plugin._getLocationImageLink(this.value);
+                        //        }
+                        //            , false);
+                        //    }
+                        //    else if (locationIDElement.attachEvent) {
+                        //        locationIDElement.attachEvent("onchange", function (e) {
+                        //            plugin._getLocationImageLink(this.value);
+                        //        });
+                        //    }
+                        plugin._getActionMessageContent(actionMessageKey);
+                        //}
+                    }
+                },
+
+                _getActionMessageContent: function (messageKey) {
+                    if (messageKey && messageKey.length > 0) {
+                        if (this._pluginHandlerRequest) {
+                            this._pluginHandlerRequest.abort();
+                            this._pluginHandlerRequest = null;
+                        }
+                        var plugin = this;
+                        this._pluginHandlerRequest = $.ajax({
+                            type: "GET",
+                            url: this._getPluginPath() + "handler/SetRequestAttributesHandler.ashx?ActionMessageKey=" + messageKey + "&RequestID=" + this._msmRequestGetId(),
+                            contentType: "application/json; charset=utf-8",
+                            dataType: "json",
+                            success: function (result) {
+                                if (result) {
+                                    this._pluginRules = JSON.parse(result);
+                                    if (this._pluginRules && this._pluginRules.rules && this._pluginRules.rules.length > 0) {
+                                        this._pluginRulesAttachEvents();
+                                        this._pluginRulesProcess();
+                                    }
+                                }
+                            }.bind(this),
+                            error: function (xhr, ajaxOptions, thrownError) {
+                                if (xhr.status > 0) this._showErrorMessage(xhr.status + '\n' + thrownError);
+                            }.bind(this)
+                        });
+                    }
+                },
+
+                _pluginRulesAttachEvents: function () {
+                    for (var i = 0; i < this._pluginRules.rules.length; i++) {
+                        var rule = this._pluginRules.rules[i];
+                        for (var j = 0; j < rule.conditions.length; j++) {
+                            var condt = rule.conditions[j];
+                            var elm_id = this._msmGetValueFieldId(condt.type, condt.id);
+                            if (elm_id && $('#' + elm_id).length) this._pluginRulesAttachEvent(elm_id, "change", this);
+                        }
+                    }
+                },
+
+                _pluginRulesAttachEvent: function (elementId, event, plugin) {
+                    var elmt = window.top.document.getElementById(elementId);
+                    if (elmt) {
+                        if (elmt.addEventListener) {
+                            elmt.addEventListener(event, function (e) {
+                                plugin._pluginRulesProcess();
+                            }
+                                , false);
+                        }
+                        else if (elmt.attachEvent) {
+                            elmt.attachEvent("on" + event, function (e) {
+                                plugin._pluginRulesProcess();
+                            });
+                        }
+                    }
+                },
+
+                _pluginRulesProcess: function () {
+                    this._modifiedAttributesInProgress = [];
+                    for (var i = 0; i < this._pluginRules.rules.length; i++) {
+                        if (this._pluginRulesCheckConditions(this._pluginRules.rules[i].conditions)) this._pluginRulesProcessActions(this._pluginRules.rules[i].actions);
+                        else this._pluginRulesRollbackActions(this._pluginRules.rules[i].actions);
+                    }
+                },
+
+                _pluginRulesCheckConditions: function (conditions) {
+                    for (var i = 0; i < conditions.length; i++) {
+                        var condt = conditions[i];
+                        if (!condt || !condt.value) return false;
+                        var fieldValue = null;
+                        switch (condt.type) {
+                            case "reqtype":
+                                fieldValue = this._msmRequestTypeGetValue();
+                                break;
+                            case "param":
+                                fieldValue = this._msmRequestIsNew();
+                                break;
+                            case "wfstatus":
+                                fieldValue = this._msmStatusGetValue();
+                                break;
+                            case "dict":
+                                fieldValue = this._msmDictionaryGetValue(condt.id);
+                                break;
+                            case "attr":
+                                fieldValue = this._msmAttributeGetValue(condt.id);
+                                break;
+                            default:
+                                break;
+                        }
+                        if (fieldValue == null) return false;
+                        if ((condt.value.constructor === Array && condt.value.indexOf(fieldValue) < 0) || (condt.value.constructor !== Array && fieldValue != condt.value)) return false;
+                    }
+                    return true;
+                },
+
+                _pluginRulesProcessActions: function (actions) {
+                    for (var i = 0; i < actions.length; i++) {
+                        var act = actions[i];
+                        switch (act.action) {
+                            case "set":
+                                switch (act.type) {
+                                    case "attr":
+                                        this._msmAttributeSetValue(act.id, act.value, act.override);
+                                        break;
+                                    default:
+                                        break;
+                                }
+                                break;
+                            default:
+                                break;
+                        }
+                    }
+                },
+
+                _pluginRulesRollbackActions: function () {
+                    for (var i = 0; i < this._modifiedAttributes.length; i++) {
+                        var mod_attr = this._modifiedAttributes[i];
+                        if (mod_attr && mod_attr.attr_id > 0 && this._modifiedAttributesInProgress.indexOf(mod_attr.attr_id) < 0) {
+                            this._msmAttributeSetValue(mod_attr.attr_id, mod_attr.attr_value, true);
+                            this._modifiedAttributes = $.grep(this._modifiedAttributes, function (attr) { return attr.attr_id != mod_attr.attr_id; });
+                        }
+                    }
+                },
+
+                _showErrorMessage: function (errorMessage) {
+                    MarvalSoftware.UI.MessageBox.show(
+                        "Set Request Attributes Plugin Error",
+                        errorMessage,
+                        MarvalSoftware.UI.MessageBox.Types.ERROR,
+                        null,
+                        null,
+                        400
+                    );
+                },
+
+                _msmGetValueFieldId: function (fld_type, fld_id) {
+                    var fldId = '';
+                    switch (fld_type) {
+                        case "wfstatus":
+                            var ctl = MarvalSoftware.UI.Controls.ScriptManager.getInstance().getControl("__Page")._workflowStatusPicker;
+                            if (ctl) fldId = ctl._valueSelect.id;
+                            break;
+                        case "dict":
+                            var ctl = MarvalSoftware.UI.Controls.ScriptManager.getInstance().getControl("__Page")._findClassificationPickerByDictionary(fld_id);
+                            if (ctl) fldId = ctl._selectedValue.id;
+                            break;
+                        case "attr":
+                            //var attrs = MarvalSoftware.UI.Controls.ScriptManager.getInstance().getControl("__Page")._attributeEnterers;
+                            //for (var i = 0; i < attrs.length; i++) { if (attrs[i].getTypeId() == fld_id) fldId = attrs[i].getAttributeValueSimpleInfo().id; }
+                            break;
+                        default:
+                            break;
+                    }
+                    return fldId;
+                },
+                _msmRequestGetId: function () {
+                    var ctl = MarvalSoftware.UI.Controls.ScriptManager.getInstance().getControl("__Page")._requestId;
+                    return ctl;
+                },
+                _msmRequestIsNew: function () {
+                    var ctl = MarvalSoftware.UI.Controls.ScriptManager.getInstance().getControl("__Page")._requestId;
+                    if (ctl === 0) return true;
+                    else return false;
+                },
+                _msmDictionaryGetValue: function (dictId) {
+                    var ctl = MarvalSoftware.UI.Controls.ScriptManager.getInstance().getControl("__Page")._findClassificationPickerByDictionary(dictId);
+                    if (ctl) return ctl.getValue().Identifier;
+                    return null;
+                },
+                _msmRequestTypeGetValue: function () {
+                    return MarvalSoftware.UI.Controls.ScriptManager.getInstance().getControl("__Page")._requestTypeId;
+                },
+                _msmStatusGetValue: function () {
+                    var ctl = MarvalSoftware.UI.Controls.ScriptManager.getInstance().getControl("__Page")._workflowStatusPicker;
+                    if (ctl) return ctl.getValue();
+                    return null;
+                },
+                _msmAttributeGetValue: function (attrId) {
+                    var attrs = MarvalSoftware.UI.Controls.ScriptManager.getInstance().getControl("__Page")._attributeEnterers;
+                    for (var i = 0; i < attrs.length; i++) {
+                        //if (attrs[i].getTypeId() == attrId) return attrs[i].getAttributeValueSimpleInfo().AttributeValue;
+                        if (attrs[i].getTypeId() == attrId) return attrs[i].getValue();
+                    }
+                    return false;
+                },
+                _msmAttributeSetValue: function (attrId, value, override) {
+                    var attrs = MarvalSoftware.UI.Controls.ScriptManager.getInstance().getControl("__Page")._attributeEnterers;
+                    for (var i = 0; i < attrs.length; i++) {
+                        if (attrs[i].getTypeId() == attrId) {
+                            var modifiedAttribute = $.grep(this._modifiedAttributes, function (e) { return e.attr_id === attrId; });
+                            // if (attrs[i].getAttributeValueSimpleInfo().AttributeValue === null || override || modifiedAttribute.length > 0) {
+                            if (attrs[i].getValue() === null || attrs[i].getValue() === false || attrs[i].getValue() === '' || override || modifiedAttribute.length > 0) {
+                                if (modifiedAttribute.length === 0) this._modifiedAttributes.push({ "attr_id": attrId, "attr_value": this._msmAttributeGetValue(attrId) });
+                                this._modifiedAttributesInProgress.push(attrId);
+                                attrs[i].setValue(value);
+                            }
+                        }
+                    }
+                }
+
+            });
+    })();
+</script>

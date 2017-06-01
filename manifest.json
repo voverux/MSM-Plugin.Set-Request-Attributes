@@ -1,0 +1,28 @@
+﻿{
+    "Name": "MarvalBaltic.Plugins.SetRequestAttributes",
+    "Organisation": "Marval Baltic",
+    "DisplayName": "Set Request Attributes",
+    "Icon": "img/request_attribute_16.png",
+    "Version": "1.1.0",
+    "SupportedVersions": [
+        "14.5.1",
+        "14.5.0",
+        "14.4.3",
+        "14.4.2",
+        "14.4.1",
+        "14.4.0",
+        "14.3.4",
+        "14.3.1"
+    ],
+    "Pages": [
+        "Request.aspx"
+    ],
+    "HtmlImportFile": "set_request_attributes.html",
+    "TagName": "marval-baltic-plugins-set-request-attributes",
+  "GlobalSettings": [
+    "Rules Action Message",
+    "MSM WSE Address",
+    "MSM WSE User Name",
+    "MSM WSE Password"
+  ]
+}
