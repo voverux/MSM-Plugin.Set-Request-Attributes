@@ -3,7 +3,7 @@
     "Organisation": "Marval Baltic",
     "DisplayName": "Set Request Attributes",
     "Icon": "img/request_attribute_16.png",
-    "Version": "1.1.0",
+    "Version": "1.2.0",
     "SupportedVersions": [
         "14.5.1",
         "14.5.0",

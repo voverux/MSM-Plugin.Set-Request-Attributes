@@ -20,11 +20,12 @@ public class SetRequestAttributesHandler : PluginHandler
 {
     public override bool IsReusable { get { return false; } }
 
-    private string mSMBaseUrl { get { return string.Format("{0}://{1}{2}{3}", HttpContext.Current.Request.Url.Scheme, HttpContext.Current.Request.Url.Host, HttpContext.Current.Request.Url.Port == 80 || HttpContext.Current.Request.Url.Port == 443 ? "" : string.Format(":{0}",HttpContext.Current.Request.Url.Port) , MarvalSoftware.UI.WebUI.ServiceDesk.WebHelper.ApplicationPath); } }
+    private string mSMBaseUrl { get { return string.Format("{0}://{1}{2}{3}", HttpContext.Current.Request.Url.Scheme, HttpContext.Current.Request.Url.Host, HttpContext.Current.Request.Url.Port == 80 || HttpContext.Current.Request.Url.Port == 443 ? "" : string.Format(":{0}", HttpContext.Current.Request.Url.Port), MarvalSoftware.UI.WebUI.ServiceDesk.WebHelper.ApplicationPath); } }
     private string pluginActionMessageKey { get { return this.GlobalSettings["Rules Action Message"]; } }
     private string mSMWSEAdr { get { return this.GlobalSettings["MSM WSE Address"]; } }
     private string mSMWSEEncUsr { get { return this.GlobalSettings["MSM WSE User Name"]; } }
     private string mSMWSEEncPwd { get { return this.GlobalSettings["MSM WSE Password"]; } }
+    private int tmpInt = 0;
 
     /// <summary>
     /// Main Request Handler
@@ -50,16 +51,28 @@ public class SetRequestAttributesHandler : PluginHandler
         if (string.IsNullOrEmpty(msgKeys)) return string.Empty;
         try
         {
-            foreach (string msgKey in msgKeys.Split(','))
+            Dictionary<int, string> messageContents = getActionMessageContents(msgKeys, reqId);
+            foreach (var messageContent in messageContents)
             {
-                string messageContent = getActionMessageContent(msgKey, reqId);
-                if (!string.IsNullOrEmpty(messageContent))
+                if (!string.IsNullOrEmpty(messageContent.Value))
                 {
                     // return JsonHelper.replaceWildcards(messageContent);
-                    jsonRulesObject pluginRulesTmp = JsonHelper.DeserializeJSONObject<jsonRulesObject>(messageContent);
+                    jsonRulesObject pluginRulesTmp = JsonHelper.DeserializeJSONObject<jsonRulesObject>(messageContent.Value);
                     //return "Plugin Rules parsed successfully";
                     if (pluginRulesTmp != null && pluginRulesTmp.rules != null && pluginRulesTmp.rules.Length > 0)
                     {
+                        // Improving performance by loading several action messages at once
+                        List<int> requiredAdditionalMessageIds = new List<int>();
+                        foreach (var pr in pluginRulesTmp.rules)
+                        {
+                            foreach (var act in pr.actions)
+                            {
+                                //return string.Format("Processing action {0}...", act.action);
+                                if (act.action == "applySetRequestAttributesXMLMessage") requiredAdditionalMessageIds.Add(act.id);
+                            }
+                        }
+                        Dictionary<int, string> msgs = getActionMessageContents(string.Format("~{0}", string.Join(",", requiredAdditionalMessageIds)), reqId);
+
                         foreach (var pr in pluginRulesTmp.rules)
                         {
                             //return string.Format("Processing rule {0}...",pr.name);
@@ -67,12 +80,12 @@ public class SetRequestAttributesHandler : PluginHandler
                             foreach (var act in pr.actions)
                             {
                                 //return string.Format("Processing action {0}...", act.action);
-                                if (act.action == "applySetRequestAttributesXMLMessage")
+                                if (act.action == "applySetRequestAttributesXMLMessage" && msgs.ContainsKey(act.id))
                                 {
                                     try
                                     {
                                         //return string.Format("Getting XML message {0}...", act.id);
-                                        string setRequestAttributeActions = getActionMessageContent(string.Format("~{0}", act.id), reqId);
+                                        string setRequestAttributeActions = msgs[act.id];
                                         if (!string.IsNullOrEmpty(setRequestAttributeActions))
                                         {
                                             //return string.Format("XML message content: {0}...", setRequestAttributeActions);
@@ -89,7 +102,7 @@ public class SetRequestAttributesHandler : PluginHandler
                                     }
                                     catch (WebException ex)
                                     {
-                                        return string.Format("XML Message deserialization exception! {0}",ex.Message);
+                                        return string.Format("XML Message deserialization exception! {0}", ex.Message);
                                     }
                                 }
                                 else
@@ -113,35 +126,35 @@ public class SetRequestAttributesHandler : PluginHandler
     }
 
     /// <summary>
-    /// Return Action Message Content
+    /// Return Action Message Contents List when several message keys supplied
     /// </summary>
-    private string getActionMessageContent(string msgKey, string reqId)
+    private Dictionary<int, string> getActionMessageContents(string msgKeys, string reqId)
     {
-        string messageContent = string.Empty;
-        if (string.IsNullOrEmpty(msgKey)) return messageContent;
+        Dictionary<int, string> messageContents = new Dictionary<int, string>();
+        if (string.IsNullOrEmpty(msgKeys)) return messageContents;
         try
         {
-            HttpWebRequest request = CreateWebRequest(this.mSMWSEAdr, "http://www.marvalbaltic.lt/MSM/WebServiceExtensions/GetActionMessages", CreateSoapEnvelope(this.mSMWSEEncUsr, this.mSMWSEEncPwd, msgKey));
+            HttpWebRequest request = CreateWebRequest(this.mSMWSEAdr, "http://www.marvalbaltic.lt/MSM/WebServiceExtensions/GetActionMessages", CreateSoapEnvelope(this.mSMWSEEncUsr, this.mSMWSEEncPwd, msgKeys));
             string response = ProcessRequest(request);
             if (!string.IsNullOrEmpty(response))
             {
                 XmlDocument soapResponse = new XmlDocument();
                 soapResponse.LoadXml(XmlHelper.EscapeEscapeChar(response));
                 XmlNodeList nodes = soapResponse.GetElementsByTagName("MSMActionMessage");
-                if (nodes.Count == 1) messageContent = nodes[0]["Content"].InnerText;
-                //if (!string.IsNullOrEmpty(messageContent))
-                //{
-                //    //int rid;
-                //    //if (Int32.TryParse(reqId, out rid)) messageContent = processMessageRazor(messageContent, rid);
-                //    //else messageContent = processMessageRazor(messageContent, 1);
-                //}
+                foreach (XmlNode n in nodes)
+                {
+                    if (int.TryParse(n["ID"].InnerText, out tmpInt)) messageContents.Add(tmpInt, n["Content"].InnerText);
+                    //if (!string.IsNullOrEmpty(messageContent))
+                    //{
+                    //    //int rid;
+                    //    //if (Int32.TryParse(reqId, out rid)) messageContent = processMessageRazor(messageContent, rid);
+                    //    //else messageContent = processMessageRazor(messageContent, 1);
+                    //}
+                }
             }
         }
-        catch (WebException ex)
-        {
-            return string.Format("Error getting Action Message content! {0}", ex.Message);
-        }
-        return messageContent;
+        catch (WebException ex) { /*???*/ }
+        return messageContents;
     }
 
     private string processMessageRazor(string MessageContent, int? RequestId)
@@ -188,8 +201,7 @@ public class SetRequestAttributesHandler : PluginHandler
     /// <returns>The XmlDocument ready to be sent</returns>
     private XmlDocument CreateSoapEnvelope(string Usr, string Pwd, string MsgKey)
     {
-        int msgId = 0;
-        if (MsgKey.Length > 1 && MsgKey[0] == '~' && int.TryParse(MsgKey.Substring(1), out msgId)) MsgKey = string.Format("id={0}", msgId);
+        if (MsgKey.Length > 1 && MsgKey[0] == '~') MsgKey = string.Format("id={0}", MsgKey.Substring(1));
         else MsgKey = string.Format("name={0}", MsgKey);
         XmlDocument soapEnvelop = new XmlDocument();
         soapEnvelop.LoadXml(string.Format(

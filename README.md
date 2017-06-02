@@ -11,7 +11,7 @@ Please feel free to contact Marval Baltic if you would like to see it working.
 
 | Plugin  | MSM              |
 |---------|------------------|
-| 1.1.0   | 14.3.1 - 14.5.1  |
+| 1.2.0   | 14.3.1 - 14.5.1  |
 
 ## Installation
 
